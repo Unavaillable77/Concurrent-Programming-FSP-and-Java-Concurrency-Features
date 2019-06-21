@@ -1,0 +1,51 @@
+////////////////////////////////////////////////////
+// FSP Printer
+// Raul Cicos
+// W1547867
+////////////////////////////////////////////////////
+
+//////////////// CONSTANTS & RANGES ////////////////
+const MAX_ID = 3
+range DOC_ID = 0 .. MAX_ID
+const MAX_PAPR = 3
+range PAPR_LVL = 0 .. MAX_PAPR
+
+//////////////// SETS ////////////////
+
+set PRINT_Actions = { print[DOC_ID], acquire, release, outOfPaper, servicePrinter, paperNotEmpty, notEnoughPaper }
+set All_Users = { tech, student_1, student_2 }
+
+//////////////// Printer Process ////////////////
+
+PRINTER( S = 3 ) = PRINTER[ S ],
+PRINTER[ i : PAPR_LVL ] 
+=  if ( i != 0 ) 
+   then ( acquire ->( print[ doc : DOC_ID ] -> release -> PRINTER[ i - 1 ]
+					| paperNotEmpty -> release -> PRINTER[ i ] ) )
+   else ( acquire -> ( outOfPaper -> servicePrinter -> release -> PRINTER[ i + 3 ]
+					 | notEnoughPaper -> release -> PRINTER[ i ] ) 
+   ) .
+
+//////////////// Student Process ////////////////
+
+STUDENT( S = 0 ) = STUDENT[ S ], 
+STUDENT[ i : DOC_ID ]
+= ( when ( i != 0 )  acquire -> ( print[i] -> release -> STUDENT[ i - 1 ]
+								| notEnoughPaper -> release -> STUDENT[ i ] )
+  | when ( i == 0 )  finished -> END
+  ) + PRINT_Actions .
+
+//////////////// Technician Process ////////////////
+
+TECH = ( acquire -> ( outOfPaper -> servicePrinter -> release -> TECH
+	   				| paperNotEmpty -> release -> TECH ) 
+	   ) + PRINT_Actions .
+
+//////////////// Parallel Composite Process ////////////////
+
+|| PRINTER_SYSTEM
+= 	(  student_1 : STUDENT ( 3 ) 
+	|| student_2 : STUDENT ( 2 )
+	|| tech : TECH
+	|| All_Users :: PRINTER ( 3 )
+	) .
